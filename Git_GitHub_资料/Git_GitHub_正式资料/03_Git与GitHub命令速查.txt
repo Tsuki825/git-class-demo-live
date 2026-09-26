@@ -1,0 +1,190 @@
+Git 与 GitHub 命令速查
+
+适用终端：Windows Git Bash、macOS Terminal（zsh / bash）、Linux Bash。
+
+参数：YOUR_USERNAME 为仓库所属账号；YOUR_NOREPLY_EMAIL 为 GitHub Settings → Emails 中提供的完整 noreply 地址，也可使用已关联到账号的邮箱。运行前替换为自己的信息。
+
+命令按章节依次操作；需要网页完成的步骤在相应章节说明。示例仅使用新建目录和个人练习仓库，不提交真实凭据。
+
+环境检查
+
+检查 Git、SSH 与当前工作目录。
+
+git --version
+ssh -V
+pwd
+
+SSH：检查已有密钥
+
+已有可用密钥时可复用；不覆盖已有私钥。
+
+ls -al ~/.ssh
+
+SSH：生成新密钥
+
+仅在需要新密钥时执行。设置密钥口令；使用自定义文件名时，后续路径也应对应修改。
+
+ssh-keygen -t ed25519 -C "git-class"
+
+SSH：添加公钥
+
+GitHub 网页：Settings → SSH and GPG keys → New SSH key → Authentication Key。添加下列命令输出的 .pub 公钥，不添加私钥。
+
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_ed25519
+cat ~/.ssh/id_ed25519.pub
+
+SSH：测试连接
+
+首次连接应与官方 SSH key fingerprints 页面核对主机指纹。返回正确用户名及 successfully authenticated 表示认证成功；该命令的退出码可能为 1。
+
+ssh -T git@github.com
+
+01. 创建本地仓库
+
+使用新建目录。mkdir 或 cd 失败时先排查，不在已有项目中继续初始化。后续操作目录为 ~/git-class-demo。
+
+cd ~
+mkdir git-class-demo
+cd git-class-demo
+git init -b main
+git config user.name "Git Demo"
+git config user.email "YOUR_NOREPLY_EMAIL"
+git config --get user.name
+git config --get user.email
+
+02. 创建示例文件
+
+以下 > 会覆盖同名文件，只用于新练习目录。预期四个文件显示为未跟踪，.env 被忽略；所有凭据字段均为无效占位值。
+
+printf '# Git Class Demo\n\nA small repository for class.\n' > README.md
+printf 'Today I learned Git.\n' > notes.txt
+cat > .gitignore <<'EOF'
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+EOF
+printf 'API_KEY=REPLACE_WITH_YOUR_OWN_VALUE\n' > .env.example
+printf 'API_KEY=DEMO_ONLY_NOT_A_REAL_KEY\n' > .env
+git status --short
+
+03. 暂存与第一次提交
+
+commit 只在本地留下记录；尚未 push 时，GitHub 不会更新。
+
+git add README.md notes.txt .gitignore .env.example
+git status --short
+git diff --cached
+git commit -m "Initial commit"
+git status
+git --no-pager log --oneline
+
+04. 修改与再次提交
+
+git diff 查看工作区差异；git diff --cached 查看将要提交的内容。
+
+printf 'I can track changes.\n' >> notes.txt
+git diff
+git add notes.txt
+git diff --cached
+git commit -m "Update learning notes"
+git --no-pager log --oneline
+git show HEAD:notes.txt
+
+05. 分支与本地合并
+
+切回 main 后，intro.txt 暂时不在当前版本中；合并后重新出现。
+
+git switch -c feature/intro
+printf 'Hello from a feature branch.\n' > intro.txt
+git add intro.txt
+git commit -m "Add introduction"
+git switch main
+ls
+git merge --no-ff feature/intro -m "Merge intro"
+git --no-pager log --oneline --graph --all
+
+06. 创建远程仓库并推送
+
+GitHub 网页：New repository → Owner 选择个人账号 → 名称 git-class-demo → Private。README 不勾选，.gitignore 与 License 选择 None，创建空仓库。首次推送完成后，在 Code 页面检查 main 分支及提交历史。
+
+git remote add origin git@github.com:YOUR_USERNAME/git-class-demo.git
+git remote -v
+git push -u origin main
+git branch -vv
+git rev-parse --short HEAD
+
+07. 克隆仓库
+
+新副本目录为 git-class-clone。检查后返回原来的 git-class-demo，后续步骤继续在原仓库中操作。
+
+cd ~
+git clone git@github.com:YOUR_USERNAME/git-class-demo.git git-class-clone
+cd git-class-clone
+cat notes.txt
+cd ~/git-class-demo
+
+08. 同步网页提交
+
+GitHub 网页：在 main 分支编辑 notes.txt，追加 Edited on GitHub.，提交说明为 Update notes from GitHub。网页提交完成后运行以下命令。
+
+cd ~/git-class-demo
+git switch main
+git status
+git pull --ff-only
+cat notes.txt
+git --no-pager log --oneline -5
+
+09. 推送功能分支
+
+功能分支推送成功不代表 main 已合并；接下来通过 Pull Request 合入。
+
+git switch -c feature/checklist
+printf 'Check status before commit.\nReview diff before push.\n' > checklist.txt
+git add checklist.txt
+git diff --cached
+git commit -m "Add demo checklist"
+git push -u origin feature/checklist
+
+10. 创建、合并并同步 Pull Request
+
+GitHub 网页：Pull requests → New pull request；base 为 main，compare 为 feature/checklist。审阅 Files changed，创建 PR，满足仓库规则后选择 Create a merge commit 并确认合并。以下命令同步合并结果；使用 Squash and merge 时保留本地功能分支，省略最后一条 branch -d。
+
+git switch main
+git pull --ff-only
+cat checklist.txt
+git --no-pager log --oneline --graph --all -8
+git branch -d feature/checklist
+
+11. 提交前安全检查
+
+ls-files -- .env 没有输出表示当前索引未跟踪该文件，不代表历史中从未出现过它。
+
+git check-ignore -v .env
+git ls-files -- .env
+git diff --cached
+git status --short
+
+12. 文件删除与历史记录
+
+使用独立的新目录 git-history-safety-lab。仅使用无效占位值，不添加远程、不上传到线上。
+
+cd ~
+mkdir git-history-safety-lab
+cd git-history-safety-lab
+git init -b main
+git config user.name "Git Demo"
+git config user.email "demo@example.invalid"
+printf 'API_KEY=DEMO_ONLY_NOT_A_REAL_KEY\n' > .env
+git add .env
+git commit -m "Add a fake classroom value"
+git rm .env
+git commit -m "Delete the fake value file"
+ls -a
+git show HEAD~1:.env
+
+当前文件被删除后，上一提交仍可读取原来的无效占位值。真实凭据泄露时，先撤销或轮换凭据，再检查影响范围并协调历史清理。
+
+参考：命令含义与官方文档索引见《Git 与 GitHub 使用指南》。
